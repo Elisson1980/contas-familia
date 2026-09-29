@@ -1,5 +1,5 @@
 // Service worker simples: busca sempre a versão nova na internet e usa a cópia salva só se estiver sem conexão.
-const CACHE = 'contas-familia-v6';
+const CACHE = 'contas-familia-v7';
 const ARQUIVOS = ['./', './index.html', './app.js', './calc.js', './firebase-config.js', './manifest.json', './icon-192.png'];
 
 self.addEventListener('install', (e) => {

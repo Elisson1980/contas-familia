@@ -1,7 +1,7 @@
 // Contas da Família — app (PWA). Tema noturno, dados no Firebase (ou modo demonstração).
 import {
   calcularConta, taxaEm, taxaDiaria, hojeISO, fmtBRL, fmtNum, fmtData, fmtPct, nomeMes, parseValorBR,
-} from './calc.js?v=16';
+} from './calc.js?v=17';
 import { firebaseConfig, LOGINS } from './firebase-config.js';
 
 // ---------------------------------------------------------------- pessoas
@@ -14,7 +14,7 @@ const PESSOAS = {
 const CONTAS = ['elisson', 'ramon', 'mariele'];
 const TODOS = ['elisson', 'ramon', 'mariele', 'pais'];
 const FIREBASE_VERSAO = '10.12.2';
-const VERSAO = '1.6';
+const VERSAO = '1.7';
 const INSTALADO = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
 const DEMO = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('COLE') || new URLSearchParams(location.search).has('demo');
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -507,8 +507,8 @@ function vPerfil() {
       <button class="btn bloco" data-acao="trocar-pin">Trocar meu PIN</button>
       <button class="btn bloco" data-acao="sair">Sair / trocar de usuário</button></section>
     <section class="secao"><h2>Tela</h2>
-      <div class="linha-sw"><span>Espaço abaixo da barra<small>Se a barra ficar cortada ou atrás da linha do iPhone, aumente até aparecer inteira</small></span></div>
-      <div class="ajuste-linha"><button class="btn" data-acao="ajuste" data-d="-5" aria-label="Diminuir 5">−</button><b>${LS.get('ajusteBarra', 0)} px</b><button class="btn" data-acao="ajuste" data-d="5" aria-label="Aumentar 5">+</button><button class="btn" data-acao="ajuste" data-d="0">Zerar</button></div>
+      <div class="linha-sw"><span>Posição dos ícones da barra<small>Baixa os ícones, tirando o espaço reservado para a linha do iPhone</small></span></div>
+      <div class="ajuste-linha">${[0, -15, -30, -45].map((v) => `<button class="btn ${LS.get('reduzBarra', 0) === -v ? 'prim' : ''}" data-acao="reduz" data-v="${-v}" aria-pressed="${LS.get('reduzBarra', 0) === -v}">${v === 0 ? 'Padrão' : v + ' px'}</button>`).join('')}</div>
       <button class="btn bloco" data-acao="recarregar">Recarregar o app (buscar versão nova)</button>
       <span class="versao">Versão ${VERSAO} · ${INSTALADO ? 'instalado na tela inicial' : 'no navegador'} · tela ${screen.width}×${screen.height} · área útil ${document.documentElement.clientWidth}×${document.documentElement.clientHeight} · janela ${window.innerWidth}×${window.innerHeight} · margens ${sonda().topo}/${sonda().base}</span>
     </section>
@@ -737,11 +737,7 @@ const acoes = {
     }
     try { await S.backend.salvarConta(k, campos); aviso('Salvo.'); } catch (e) { aviso(traduzErro(e)); }
   },
-  ajuste(el) {
-    const d = Number(el.dataset.d);
-    const v = d === 0 ? 0 : Math.max(0, Math.min(120, LS.get('ajusteBarra', 0) + d));
-    LS.set('ajusteBarra', v); ajustarViewport(); render();
-  },
+  reduz(el) { LS.set('reduzBarra', Number(el.dataset.v)); ajustarViewport(); render(); },
   async recarregar() {
     try { const ks = await caches.keys(); await Promise.all(ks.map((k) => caches.delete(k))); } catch { /* sem cache */ }
     try { const rs = await navigator.serviceWorker?.getRegistrations?.(); await Promise.all((rs || []).map((r) => r.update())); } catch { /* sem sw */ }
@@ -788,7 +784,7 @@ function sonda() {
 }
 function ajustarViewport() {
   const raiz = document.documentElement.style;
-  raiz.setProperty('--ajuste', LS.get('ajusteBarra', 0) + 'px');
+  raiz.setProperty('--reduz', LS.get('reduzBarra', 0) + 'px');
   if (vv && vv.height < window.innerHeight - 80) { raiz.setProperty('--vvh', vv.height + 'px'); raiz.setProperty('--vvt', vv.offsetTop + 'px'); }
   else { raiz.removeProperty('--vvh'); raiz.removeProperty('--vvt'); }
   window.scrollTo(0, 0);
