@@ -198,9 +198,11 @@ async function ativarBio(k) {
   } });
   const pk = passkeys(); pk[k] = b64u(cred.rawId); LS.set('passkeys', pk);
 }
-async function desbloquear() {
+async function desbloquear(automatico = false) {
   const id = passkeys()[S.eu];
   if (!id) { S.bloqueado = false; irPara('#/inicio'); return; }
+  if (S.bioEmCurso) return;
+  S.bioEmCurso = true;
   try {
     await navigator.credentials.get({ publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
@@ -208,9 +210,10 @@ async function desbloquear() {
       userVerification: 'required', timeout: 60000,
     } });
     S.bloqueado = false; irPara('#/inicio');
-  } catch {
-    aviso(`Não foi possível confirmar. Tente de novo ou toque no seu nome e use o PIN.`);
-  }
+  } catch (e) {
+    // no automático, o navegador pode recusar sem um toque: fica o botão
+    if (!automatico) aviso(`Não foi possível confirmar. Tente de novo ou toque no seu nome e use o PIN.`);
+  } finally { S.bioEmCurso = false; }
 }
 
 // ---------------------------------------------------------------- peças visuais
@@ -568,7 +571,10 @@ function render() {
   const chave = (!S.eu || S.bloqueado) ? 'login' : location.hash;
   const rolagem = chave === S.ultimaTela ? ($('#app .tela, #app .login')?.scrollTop || 0) : 0;
   S.ultimaTela = chave;
-  if (!S.eu || S.bloqueado) app.innerHTML = vLogin();
+  if (!S.eu || S.bloqueado) {
+    app.innerHTML = vLogin();
+    if (S.eu && passkeys()[S.eu] && !S.bioTentada) { S.bioTentada = true; setTimeout(() => desbloquear(true), 250); }
+  }
   else if (!S.dados || !S.calc) app.innerHTML = '<div class="carregando">Carregando…</div>';
   else {
     const r = rota();
@@ -668,7 +674,7 @@ const acoes = {
   },
   'sw-bloq'() { LS.set('bloquearAoSair', !LS.get('bloquearAoSair', true)); render(); },
   bloquear() {
-    S.bloqueado = true; fecharSheet(); render();
+    S.bloqueado = true; S.bioTentada = false; fecharSheet(); render();
   },
   'ir-perfil'() { fecharSheet(); irPara('#/perfil'); },
   async sair() { await S.backend.sair(); location.hash = ''; },
@@ -751,6 +757,17 @@ document.addEventListener('change', async (e) => {
     await S.backend.salvarPerfil(S.eu, { avatar: foto }); aviso('Foto atualizada.');
   } catch (err) { aviso(traduzErro(err)); }
 });
+// iPhone: quando o teclado abre, o painel (sheet) acompanha a área visível; quando fecha, nada fica deslocado
+const vv = window.visualViewport;
+function ajustarViewport() {
+  const raiz = document.documentElement.style;
+  if (vv && vv.height < window.innerHeight - 80) { raiz.setProperty('--vvh', vv.height + 'px'); raiz.setProperty('--vvt', vv.offsetTop + 'px'); }
+  else { raiz.removeProperty('--vvh'); raiz.removeProperty('--vvt'); }
+  window.scrollTo(0, 0);
+}
+if (vv) { vv.addEventListener('resize', ajustarViewport); vv.addEventListener('scroll', ajustarViewport); }
+window.addEventListener('resize', ajustarViewport);
+document.addEventListener('focusout', () => { setTimeout(ajustarViewport, 80); });
 document.addEventListener('focusout', () => { if (S.pendente) setTimeout(() => { if (!document.activeElement?.closest?.('#app input')) { S.pendente = false; render(); } }, 50); });
 window.addEventListener('hashchange', () => render());
 
@@ -758,7 +775,8 @@ window.addEventListener('hashchange', () => render());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { document.body.classList.add('oculto-privacidade'); S.saiuEm = Date.now(); return; }
   document.body.classList.remove('oculto-privacidade');
-  if (S.eu && LS.get('bloquearAoSair', true) && Date.now() - S.saiuEm > 10 * 60000) { S.bloqueado = true; fecharSheet(); render(); }
+  if (S.eu && LS.get('bloquearAoSair', true) && Date.now() - S.saiuEm > 10 * 60000) { S.bloqueado = true; S.bioTentada = false; fecharSheet(); render(); }
+  else if (S.eu && S.bloqueado) { S.bioTentada = false; render(); } // voltou ao app ainda travado: tenta o Face ID de novo
   if (S.dados) { recalcular(); render(); } // a data pode ter mudado
 });
 
@@ -773,7 +791,7 @@ async function iniciar() {
     if (k !== S.eu) {
       S.eu = k; S.dados = null; S.calc = null;
       if (k && S.entrando) { S.bloqueado = false; S.entrando = false; if (!location.hash || location.hash === '#') location.hash = '#/inicio'; }
-      else S.bloqueado = true; // app aberto de novo: pede Face ID/código ou o PIN
+      else { S.bloqueado = true; S.bioTentada = false; } // app aberto de novo: pede Face ID/código ou o PIN
       if (k && !S.bloqueado && (!location.hash || location.hash === '#')) location.hash = '#/inicio';
     }
     render();
