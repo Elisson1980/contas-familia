@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
 <style>
 :root{
-  --bg:#0E1116; --s1:#131820; --s2:#151A21; --s3:#181E26; --tab:#11151B;
+  --bg:#0E1116; --s1:#131820; --s2:#151A21; --s3:#181E26; --tab:#0E1116;
   --b1:#232A33; --b2:#333A44; --b3:#4E545D;
   --t1:#EDE6D6; --t2:#CFC7B6; --t3:#9A9384;
   --ouro:#C9A96A; --ouro2:#E3D3AE; --escuro:#14110B;
@@ -32,10 +32,9 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 /* html/body FIXOS: no iPhone (app na tela inicial) o teclado empurra a página para cima e ela não volta; fixo, isso não acontece */
 html,body{margin:0;position:fixed;inset:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--t1);font-family:var(--txt);-webkit-font-smoothing:antialiased;overscroll-behavior:none}
-/* app ocupa a tela inteira; só o conteúdo rola; a barra de abas fica sempre no rodapé (sem position:fixed) */
-/* altura do app medida em JS (--alt): no iPhone instalado, "100%" às vezes fica menor que a tela e a barra sobe */
-#app{position:fixed;top:0;left:0;width:100%;height:var(--alt,100%);display:flex;flex-direction:column;overflow:hidden}
-.abas{margin-bottom:var(--ajuste,0px)}
+/* o app ocupa exatamente a área útil que o sistema dá à página; qualquer faixa fora dela (topo ou base) fica na mesma cor do app */
+#app{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden}
+#sonda{position:absolute;left:-9999px;top:0;height:0;padding-bottom:env(safe-area-inset-bottom,0px);padding-top:env(safe-area-inset-top,0px)}
 .ajuste-linha{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .ajuste-linha .btn{height:44px;min-width:56px;padding:0}
 .ajuste-linha b{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:16px;min-width:60px;text-align:center}
@@ -56,7 +55,7 @@ button{cursor:pointer}
 .ola{display:flex;align-items:center;gap:12px;font-family:var(--num);font-weight:600;font-size:18px}
 .icone{width:44px;height:44px;border-radius:14px;border:1px solid var(--b1);background:var(--s1);display:grid;place-items:center;padding:0;flex:none}
 .icone svg{width:20px;height:20px}
-.abas{flex:none;position:relative;height:var(--abas);padding:0 8px var(--base);background:var(--tab);border-top:1px solid var(--b1);display:grid;grid-template-columns:repeat(3,1fr);z-index:20}
+.abas{flex:none;position:relative;height:auto;padding:0 8px min(var(--base),40px);margin-bottom:var(--ajuste,0px);background:var(--tab);border-top:1px solid var(--b1);display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:64px;z-index:20}
 .abas a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:500;color:var(--t3);min-height:44px}
 .abas a[aria-current="page"]{color:var(--ouro)}
 .abas svg{width:22px;height:22px}
@@ -235,6 +234,7 @@ button{cursor:pointer}
 <body>
 <div id="app"><div class="carregando">Carregando…</div></div>
 <div id="camada"></div>
-<script type="module" src="app.js?v=15"></script>
+<div id="sonda" aria-hidden="true"></div>
+<script type="module" src="app.js?v=16"></script>
 </body>
 </html>

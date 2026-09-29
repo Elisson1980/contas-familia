@@ -1,7 +1,7 @@
 // Contas da Família — app (PWA). Tema noturno, dados no Firebase (ou modo demonstração).
 import {
   calcularConta, taxaEm, taxaDiaria, hojeISO, fmtBRL, fmtNum, fmtData, fmtPct, nomeMes, parseValorBR,
-} from './calc.js?v=15';
+} from './calc.js?v=16';
 import { firebaseConfig, LOGINS } from './firebase-config.js';
 
 // ---------------------------------------------------------------- pessoas
@@ -14,7 +14,7 @@ const PESSOAS = {
 const CONTAS = ['elisson', 'ramon', 'mariele'];
 const TODOS = ['elisson', 'ramon', 'mariele', 'pais'];
 const FIREBASE_VERSAO = '10.12.2';
-const VERSAO = '1.5';
+const VERSAO = '1.6';
 const INSTALADO = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
 const DEMO = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('COLE') || new URLSearchParams(location.search).has('demo');
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -507,10 +507,10 @@ function vPerfil() {
       <button class="btn bloco" data-acao="trocar-pin">Trocar meu PIN</button>
       <button class="btn bloco" data-acao="sair">Sair / trocar de usuário</button></section>
     <section class="secao"><h2>Tela</h2>
-      <div class="linha-sw"><span>Ajuste da barra inferior<small>Se a barra ficar acima do fim da tela, aumente; se ficar cortada, diminua</small></span></div>
-      <div class="ajuste-linha"><button class="btn" data-acao="ajuste" data-d="-5" aria-label="Diminuir 5">−</button><b>${LS.get('ajusteBarra', 0) > 0 ? '+' : ''}${LS.get('ajusteBarra', 0)} px</b><button class="btn" data-acao="ajuste" data-d="5" aria-label="Aumentar 5">+</button><button class="btn" data-acao="ajuste" data-d="0">Zerar</button></div>
+      <div class="linha-sw"><span>Espaço abaixo da barra<small>Se a barra ficar cortada ou atrás da linha do iPhone, aumente até aparecer inteira</small></span></div>
+      <div class="ajuste-linha"><button class="btn" data-acao="ajuste" data-d="-5" aria-label="Diminuir 5">−</button><b>${LS.get('ajusteBarra', 0)} px</b><button class="btn" data-acao="ajuste" data-d="5" aria-label="Aumentar 5">+</button><button class="btn" data-acao="ajuste" data-d="0">Zerar</button></div>
       <button class="btn bloco" data-acao="recarregar">Recarregar o app (buscar versão nova)</button>
-      <span class="versao">Versão ${VERSAO} · ${INSTALADO ? 'instalado na tela inicial' : 'aberto no navegador'} · tela ${screen.width}×${screen.height} · janela ${window.innerWidth}×${window.innerHeight}</span>
+      <span class="versao">Versão ${VERSAO} · ${INSTALADO ? 'instalado na tela inicial' : 'no navegador'} · tela ${screen.width}×${screen.height} · área útil ${document.documentElement.clientWidth}×${document.documentElement.clientHeight} · janela ${window.innerWidth}×${window.innerHeight} · margens ${sonda().topo}/${sonda().base}</span>
     </section>
     ${S.backend.demo ? '<section class="secao"><h2>Modo demonstração</h2><span class="t3" style="font-size:13px">Os dados ficam só neste aparelho. Cole a configuração do Firebase em firebase-config.js para usar de verdade.</span><button class="btn bloco" data-acao="demo-reiniciar">Recomeçar dados de exemplo</button></section>' : ''}
   </div>${abas('perfil')}`;
@@ -739,7 +739,7 @@ const acoes = {
   },
   ajuste(el) {
     const d = Number(el.dataset.d);
-    const v = d === 0 ? 0 : Math.max(-120, Math.min(200, LS.get('ajusteBarra', 0) + d));
+    const v = d === 0 ? 0 : Math.max(0, Math.min(120, LS.get('ajusteBarra', 0) + d));
     LS.set('ajusteBarra', v); ajustarViewport(); render();
   },
   async recarregar() {
@@ -775,29 +775,22 @@ document.addEventListener('change', async (e) => {
     await S.backend.salvarPerfil(S.eu, { avatar: foto }); aviso('Foto atualizada.');
   } catch (err) { aviso(traduzErro(err)); }
 });
-// ---------------------------------------------------------------- altura do app (correção iPhone)
-// No iPhone com o app na tela inicial, a área de layout às vezes fica MENOR que a tela (depois do teclado,
-// de trocar de app etc.) e a barra de abas "sobe". Por isso medimos a altura nós mesmos:
-// - iPhone/iPad instalado, ocupando a largura toda: a tela inteira (screen), que não muda com esses bugs;
-// - outros casos: a altura real da janela.
+// ---------------------------------------------------------------- área útil da tela (iPhone)
+// O app ocupa exatamente a área que o sistema dá à página (body fixo, inset 0). Não medimos altura
+// nenhuma em JS: no iPhone instalado, medidas como innerHeight/screen.height enganam.
+// Aqui só: (1) o painel acompanha o teclado, (2) desfazemos rolagens que o iOS faz para mostrar um campo,
+// (3) aplicamos o ajuste manual (espaço extra abaixo da barra).
 const vv = window.visualViewport;
-function alturaTela() {
-  const retrato = matchMedia('(orientation: portrait)').matches;
-  const larguraTela = retrato ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
-  const alturaTelaCheia = retrato ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
-  const larguraToda = Math.abs(window.innerWidth - larguraTela) <= 2;
-  if (IOS && INSTALADO && larguraToda) return alturaTelaCheia;
-  return Math.max(window.innerHeight, vv ? vv.height : 0);
+function sonda() {
+  const el = $('#sonda'); if (!el) return { base: 0, topo: 0 };
+  const cs = getComputedStyle(el);
+  return { base: parseFloat(cs.paddingBottom) || 0, topo: parseFloat(cs.paddingTop) || 0 };
 }
 function ajustarViewport() {
   const raiz = document.documentElement.style;
-  const ajuste = LS.get('ajusteBarra', 0);
-  raiz.setProperty('--alt', (alturaTela() + ajuste) + 'px');
-  raiz.setProperty('--ajuste', ajuste + 'px');
-  // painel (sheet) acompanha a área visível quando o teclado está aberto
+  raiz.setProperty('--ajuste', LS.get('ajusteBarra', 0) + 'px');
   if (vv && vv.height < window.innerHeight - 80) { raiz.setProperty('--vvh', vv.height + 'px'); raiz.setProperty('--vvt', vv.offsetTop + 'px'); }
   else { raiz.removeProperty('--vvh'); raiz.removeProperty('--vvt'); }
-  // desfaz qualquer rolagem que o iOS tenha feito para mostrar um campo
   window.scrollTo(0, 0);
   for (const el of [document.documentElement, document.body, $('#app'), $('#camada')]) if (el && el.scrollTop) el.scrollTop = 0;
 }
