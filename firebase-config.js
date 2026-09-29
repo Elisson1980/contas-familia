@@ -7,12 +7,13 @@
 // ============================================================
 
 export const firebaseConfig = {
-  apiKey: "COLE_AQUI",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyAApFxT0BfWthXhprEGc9DvxzREVQAR8vo",
+  authDomain: "contas-familia-96ba4.firebaseapp.com",
+  projectId: "contas-familia-96ba4",
+  storageBucket: "contas-familia-96ba4.firebasestorage.app",
+  messagingSenderId: "83612480784",
+  appId: "1:83612480784:web:2718ee9c9880b245316195",
+  measurementId: "G-YZHRPWVY8H"
 };
 
 // Logins internos: ninguém digita nem vê estes endereços; cada pessoa entra com
