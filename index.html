@@ -33,7 +33,13 @@
 /* html/body FIXOS: no iPhone (app na tela inicial) o teclado empurra a página para cima e ela não volta; fixo, isso não acontece */
 html,body{margin:0;position:fixed;inset:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--t1);font-family:var(--txt);-webkit-font-smoothing:antialiased;overscroll-behavior:none}
 /* app ocupa a tela inteira; só o conteúdo rola; a barra de abas fica sempre no rodapé (sem position:fixed) */
-#app{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden}
+/* altura do app medida em JS (--alt): no iPhone instalado, "100%" às vezes fica menor que a tela e a barra sobe */
+#app{position:fixed;top:0;left:0;width:100%;height:var(--alt,100%);display:flex;flex-direction:column;overflow:hidden}
+.abas{margin-bottom:var(--ajuste,0px)}
+.ajuste-linha{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ajuste-linha .btn{height:44px;min-width:56px;padding:0}
+.ajuste-linha b{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:16px;min-width:60px;text-align:center}
+.versao{font-size:11px;color:var(--t3);text-align:center}
 a{color:inherit;text-decoration:none}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -229,6 +235,6 @@ button{cursor:pointer}
 <body>
 <div id="app"><div class="carregando">Carregando…</div></div>
 <div id="camada"></div>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=15"></script>
 </body>
 </html>
