@@ -1,7 +1,7 @@
 // Contas da Família — app (PWA). Tema noturno, dados no Firebase (ou modo demonstração).
 import {
   calcularConta, taxaEm, taxaDiaria, hojeISO, fmtBRL, fmtNum, fmtData, fmtPct, nomeMes, parseValorBR,
-} from './calc.js?v=17';
+} from './calc.js?v=18';
 import { firebaseConfig, LOGINS } from './firebase-config.js';
 
 // ---------------------------------------------------------------- pessoas
@@ -14,7 +14,7 @@ const PESSOAS = {
 const CONTAS = ['elisson', 'ramon', 'mariele'];
 const TODOS = ['elisson', 'ramon', 'mariele', 'pais'];
 const FIREBASE_VERSAO = '10.12.2';
-const VERSAO = '1.7';
+const VERSAO = '1.8';
 const INSTALADO = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
 const DEMO = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('COLE') || new URLSearchParams(location.search).has('demo');
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -45,6 +45,23 @@ const ic = {
   rosto: svg('<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5v3.5h-1"/><path d="M9.5 16c1.4 1 3.6 1 5 0"/>'),
   check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
 };
+
+// Taxa digitada → fração. Aceita vírgula ou ponto como decimal ("0,85", "0.85", "1", "1,5%").
+function lerTaxa(texto) {
+  const t = String(texto ?? '').trim().replace('%', '').replace(/\s/g, '').replace(',', '.');
+  if (!/^\d{0,2}(\.\d{1,4})?$/.test(t) || t === '' || t === '.') return null;
+  return Math.round((Number(t) / 100) * 1e8) / 1e8;
+}
+// Mostra a taxa com 2 a 4 casas ("0,85", "1,00", "0,875")
+const fmtTaxa = (frac) => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(frac * 100);
+const anualComposta = (m) => Math.pow(1 + m, 12) - 1;
+function textoConferencia(m) {
+  if (m == null) return { anual: '', ajuda: 'Use vírgula para casas decimais: 0,85 · 0,5 · 1,2' };
+  return {
+    anual: `${fmtNum(anualComposta(m) * 100)}% ao ano`,
+    ajuda: `≈ ${fmtPct(taxaDiaria(m), 4)} por dia útil · 12 × ${fmtTaxa(m)}% = ${fmtNum(m * 1200)}% sem juros sobre juros`,
+  };
+}
 
 // ---------------------------------------------------------------- estado
 const S = {
@@ -233,7 +250,7 @@ const logo = (grande = true) => S.logo
   ? `<span class="banco tem-logo" style="width:${grande ? 86 : 'auto'}px"><img src="logo-banco.png" alt="Itaú Personnalité"></span>`
   : `<span class="banco" style="${grande ? 'width:86px' : ''}">logo Itaú<br>Personnalité</span>`;
 const agConta = (c) => `Ag. ${esc(c?.agencia || '0000')} · C/C ${esc(c?.conta || '00000-0')}`;
-const taxaTxt = (k) => { const t = S.calc[k].taxaAtual; return (S.dados.contas[k]?.taxas || []).length ? `${fmtPct(t)} a.m.` : ''; };
+const taxaTxt = (k) => { const t = S.calc[k].taxaAtual; return (S.dados.contas[k]?.taxas || []).length ? `${fmtTaxa(t)}% a.m.` : ''; };
 const reais = (v) => `<span class="num">${fmtBRL(v)}</span>`;
 
 function abas(ativa) {
@@ -402,7 +419,7 @@ function vConta(k) {
   const c = S.calc[k]; const conta = S.dados.contas[k] || {}; const eu = k === S.eu;
   const taxas = conta.taxas || [];
   const linhaInv = [conta.investimento ? esc(conta.investimento) : 'Investimento não definido',
-    taxas.length ? `${fmtPct(c.taxaAtual)} a.m.` : null,
+    taxas.length ? `${fmtTaxa(c.taxaAtual)}% a.m.` : null,
     taxas.length ? `${fmtPct(taxaDiaria(c.taxaAtual), 4)} ao dia útil` : null].filter(Boolean).join(' · ');
   // extrato: lançamentos (com id) + uma linha de rendimento por mês
   const itens = [
@@ -477,7 +494,7 @@ function vPerfil() {
   const conta = S.dados.contas[k] || {}; const taxas = conta.taxas || [];
   const txAtual = taxas.length ? taxaEm(taxas, S.calc.hoje) : null;
   const pk = !!passkeys()[k]; const bloq = LS.get('bloquearAoSair', true);
-  const hist = [...taxas].sort((a, b) => b.aPartirDe.localeCompare(a.aPartirDe)).map((t) => `${fmtPct(t.mensal)} a.m. desde ${fmtData(t.aPartirDe)}`).join(' · ');
+  const hist = [...taxas].sort((a, b) => b.aPartirDe.localeCompare(a.aPartirDe)).map((t) => `${fmtTaxa(t.mensal)}% a.m. desde ${fmtData(t.aPartirDe)}`).join(' · ');
   return `<div class="tela">
     <header class="topo"><h1 class="num" style="margin:0;font-size:28px;font-weight:700">Perfil</h1></header>
     <section class="perfil-cab">${avatar(k, 88)}
@@ -493,8 +510,10 @@ function vPerfil() {
       <span class="t3" style="font-size:12px">Cada pessoa escolhe a sua. Fica salvo no seu login.</span></section>
     ${titular ? `<section class="secao"><h2>Meu investimento <span class="selo">Só você edita</span></h2>
       <div class="campo"><label for="inv-nome">Nome do investimento</label><input id="inv-nome" maxlength="60" value="${esc(conta.investimento || '')}" placeholder="Ex.: CDB Itaú Personnalité"></div>
-      <div class="campo"><label for="inv-taxa">Taxa mensal (% a.m.)</label><input id="inv-taxa" inputmode="decimal" value="${txAtual != null ? fmtNum(txAtual * 100) : ''}" placeholder="1,00">
-        <span class="ajuda">${txAtual != null ? `≈ ${fmtPct(taxaDiaria(txAtual), 4)} por dia útil · ` : ''}uma nova taxa vale a partir de hoje</span></div>
+      <div class="campo"><label for="inv-taxa">Rendimento ao mês (% a.m.)</label><input id="inv-taxa" inputmode="decimal" autocomplete="off" value="${txAtual != null ? fmtTaxa(txAtual) : ''}" placeholder="Ex.: 0,85">
+        <span class="ajuda" id="inv-taxa-ajuda">${textoConferencia(txAtual).ajuda}</span></div>
+      <div class="campo"><label for="inv-anual">Rendimento ao ano (só para conferir)</label><input id="inv-anual" class="somente-leitura" readonly tabindex="-1" value="${textoConferencia(txAtual).anual}" placeholder="—">
+        <span class="ajuda">Calculado sozinho: juros compostos de 12 meses. Uma taxa nova vale a partir de hoje.</span></div>
       <div class="dupla"><div class="campo"><label for="inv-ag">Agência</label><input id="inv-ag" inputmode="numeric" maxlength="6" value="${esc(conta.agencia || '')}" placeholder="0000"></div>
         <div class="campo"><label for="inv-cc">Conta</label><input id="inv-cc" maxlength="12" value="${esc(conta.conta || '')}" placeholder="00000-0"></div></div>
       ${hist ? `<span class="t3" style="font-size:12px">Histórico: ${hist}</span>` : ''}
@@ -507,8 +526,13 @@ function vPerfil() {
       <button class="btn bloco" data-acao="trocar-pin">Trocar meu PIN</button>
       <button class="btn bloco" data-acao="sair">Sair / trocar de usuário</button></section>
     <section class="secao"><h2>Tela</h2>
-      <div class="linha-sw"><span>Posição dos ícones da barra<small>Baixa os ícones, tirando o espaço reservado para a linha do iPhone</small></span></div>
-      <div class="ajuste-linha">${[0, -15, -30, -45].map((v) => `<button class="btn ${LS.get('reduzBarra', 0) === -v ? 'prim' : ''}" data-acao="reduz" data-v="${-v}" aria-pressed="${LS.get('reduzBarra', 0) === -v}">${v === 0 ? 'Padrão' : v + ' px'}</button>`).join('')}</div>
+      <div class="linha-sw"><span>Posição dos ícones da barra<small>− desce os ícones · + sobe os ícones (de 5 em 5 px)</small></span></div>
+      <div class="ajuste-linha">
+        <button class="btn" data-acao="pos-barra" data-d="0">Padrão</button>
+        <button class="btn" data-acao="pos-barra" data-d="-5" aria-label="Descer 5 px">−</button>
+        <b aria-live="polite">${posBarra() > 0 ? '+' : ''}${posBarra()} px</b>
+        <button class="btn" data-acao="pos-barra" data-d="5" aria-label="Subir 5 px">+</button>
+      </div>
       <button class="btn bloco" data-acao="recarregar">Recarregar o app (buscar versão nova)</button>
       <span class="versao">Versão ${VERSAO} · ${INSTALADO ? 'instalado na tela inicial' : 'no navegador'} · tela ${screen.width}×${screen.height} · área útil ${document.documentElement.clientWidth}×${document.documentElement.clientHeight} · janela ${window.innerWidth}×${window.innerHeight} · margens ${sonda().topo}/${sonda().base}</span>
     </section>
@@ -724,8 +748,8 @@ const acoes = {
     const numConta = ($('#inv-cc')?.value || '').trim().slice(0, 12);
     const campos = { investimento: nome, agencia, conta: numConta };
     if (txt) {
-      const taxa = Math.round((Number(txt.replace(/\./g, '').replace(',', '.')) / 100) * 1e6) / 1e6;
-      if (!Number.isFinite(taxa) || taxa < 0 || taxa > 0.2) return aviso('Taxa inválida. Use por exemplo 1,00 para 1% ao mês.');
+      const taxa = lerTaxa(txt);
+      if (taxa == null || taxa < 0 || taxa > 0.2) return aviso('Taxa inválida. Exemplos: 0,85 · 0,5 · 1,00 (até 20% ao mês).');
       let taxas = [...(conta.taxas || [])]; const hoje = hojeISO();
       if (!taxas.length) {
         const primeira = (S.dados.lanc[k] || []).map((l) => l.data).sort()[0];
@@ -737,7 +761,11 @@ const acoes = {
     }
     try { await S.backend.salvarConta(k, campos); aviso('Salvo.'); } catch (e) { aviso(traduzErro(e)); }
   },
-  reduz(el) { LS.set('reduzBarra', Number(el.dataset.v)); ajustarViewport(); render(); },
+  'pos-barra'(el) {
+    const d = Number(el.dataset.d);
+    const v = d === 0 ? 0 : Math.max(-40, Math.min(60, posBarra() + d));
+    LS.set('posBarra', v); ajustarViewport(); render();
+  },
   async recarregar() {
     try { const ks = await caches.keys(); await Promise.all(ks.map((k) => caches.delete(k))); } catch { /* sem cache */ }
     try { const rs = await navigator.serviceWorker?.getRegistrations?.(); await Promise.all((rs || []).map((r) => r.update())); } catch { /* sem sw */ }
@@ -763,6 +791,13 @@ document.addEventListener('keydown', (e) => {
     else if (e.key === 'Backspace') acoes['pin-apagar']();
   }
 });
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'inv-taxa') return;
+  const t = textoConferencia(lerTaxa(e.target.value));
+  const anual = $('#inv-anual'); const ajuda = $('#inv-taxa-ajuda');
+  if (anual) anual.value = e.target.value.trim() && !t.anual ? 'taxa inválida' : t.anual;
+  if (ajuda) ajuda.textContent = t.ajuda;
+});
 document.addEventListener('change', async (e) => {
   if (e.target.id !== 'foto' || !e.target.files?.[0]) return;
   try {
@@ -776,6 +811,12 @@ document.addEventListener('change', async (e) => {
 // nenhuma em JS: no iPhone instalado, medidas como innerHeight/screen.height enganam.
 // Aqui só: (1) o painel acompanha o teclado, (2) desfazemos rolagens que o iOS faz para mostrar um campo,
 // (3) aplicamos o ajuste manual (espaço extra abaixo da barra).
+// posição dos ícones: negativo desce, positivo sobe (migra o ajuste da versão 1.7)
+function posBarra() {
+  const v = LS.get('posBarra', null);
+  if (v != null) return v;
+  const antigo = LS.get('reduzBarra', 0); return antigo ? -antigo : 0;
+}
 const vv = window.visualViewport;
 function sonda() {
   const el = $('#sonda'); if (!el) return { base: 0, topo: 0 };
@@ -784,7 +825,7 @@ function sonda() {
 }
 function ajustarViewport() {
   const raiz = document.documentElement.style;
-  raiz.setProperty('--reduz', LS.get('reduzBarra', 0) + 'px');
+  raiz.setProperty('--pos', posBarra() + 'px');
   if (vv && vv.height < window.innerHeight - 80) { raiz.setProperty('--vvh', vv.height + 'px'); raiz.setProperty('--vvt', vv.offsetTop + 'px'); }
   else { raiz.removeProperty('--vvh'); raiz.removeProperty('--vvt'); }
   window.scrollTo(0, 0);

@@ -39,7 +39,10 @@ html,body{margin:0;position:fixed;inset:0;width:100%;height:100%;overflow:hidden
 #app{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden}
 #sonda{position:absolute;left:-9999px;top:0;height:0;padding-bottom:env(safe-area-inset-bottom,0px);padding-top:env(safe-area-inset-top,0px)}
 .ajuste-linha{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.ajuste-linha .btn{flex:1;height:44px;min-width:0;padding:0 4px;font-size:14px}
+.ajuste-linha .btn{flex:1;height:44px;min-width:0;padding:0 4px;font-size:15px}
+.ajuste-linha .btn[data-d="-5"],.ajuste-linha .btn[data-d="5"]{flex:0 0 56px;font-size:22px;font-weight:600}
+.ajuste-linha b{flex:0 0 72px}
+.campo input.somente-leitura{background:transparent;border-style:dashed;color:var(--ouro2);font-family:var(--num);font-weight:600}
 .ajuste-linha b{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:16px;min-width:60px;text-align:center}
 .versao{font-size:11px;color:var(--t3);text-align:center}
 a{color:inherit;text-decoration:none}
@@ -58,7 +61,7 @@ button{cursor:pointer}
 .ola{display:flex;align-items:center;gap:12px;font-family:var(--num);font-weight:600;font-size:18px}
 .icone{width:44px;height:44px;border-radius:14px;border:1px solid var(--b1);background:var(--s1);display:grid;place-items:center;padding:0;flex:none}
 .icone svg{width:20px;height:20px}
-.abas{flex:none;position:relative;height:auto;padding:0 8px max(0px, calc(min(var(--base),40px) - var(--reduz,0px)));background:var(--tab);border-top:1px solid var(--b1);display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:64px;z-index:20}
+.abas{flex:none;position:relative;height:auto;padding:0 8px max(0px, calc(min(var(--base),40px) + var(--pos,0px)));background:var(--tab);border-top:1px solid var(--b1);display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:64px;z-index:20}
 .abas a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:500;color:var(--t3);min-height:44px}
 .abas a[aria-current="page"]{color:var(--ouro)}
 .abas svg{width:22px;height:22px}
@@ -238,6 +241,6 @@ button{cursor:pointer}
 <div id="app"><div class="carregando">Carregando…</div></div>
 <div id="camada"></div>
 <div id="sonda" aria-hidden="true"></div>
-<script type="module" src="app.js?v=17"></script>
+<script type="module" src="app.js?v=18"></script>
 </body>
 </html>
