@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// Contas da Família — regras de segurança do Firestore.
+// Cole este arquivo inteiro, sem mudar nada, em: Console do Firebase > Firestore Database > Regras > Publicar.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Logins internos (iguais aos de firebase-config.js). Não precisa editar.
+    function membros() {
+      return {
+        'elisson@contas-familia.example.com': 'elisson',
+        'ramon@contas-familia.example.com':   'ramon',
+        'mariele@contas-familia.example.com': 'mariele',
+        'pais@contas-familia.example.com':    'pais'
+      };
+    }
+
+    function quem() {
+      return request.auth == null ? '' : membros().get(request.auth.token.email, '');
+    }
+    function membro() { return quem() != ''; }
+
+    // Cada filho tem uma conta: elisson, ramon, mariele. Todos da família leem; só o titular altera.
+    match /contas/{conta} {
+      allow read: if membro();
+      allow create, update: if quem() == conta
+        && conta in ['elisson', 'ramon', 'mariele']
+        && request.resource.data.keys().hasOnly(['investimento', 'agencia', 'conta', 'taxas']);
+      allow delete: if false;
+
+      // Depósitos e retiradas: só o titular lança; ninguém edita.
+      // Um lançamento pode ser excluído pelo titular só nos 15 minutos seguintes (para corrigir erro de digitação).
+      match /lancamentos/{id} {
+        allow read: if membro();
+        allow create: if quem() == conta
+          && conta in ['elisson', 'ramon', 'mariele']
+          && request.resource.data.keys().hasOnly(['tipo', 'valorCentavos', 'data', 'criadoPor', 'criadoEm'])
+          && request.resource.data.tipo in ['deposito', 'retirada']
+          && request.resource.data.valorCentavos is int
+          && request.resource.data.valorCentavos > 0
+          && request.resource.data.data is string
+          && request.resource.data.criadoPor == request.auth.token.email
+          && request.resource.data.criadoEm == request.time;
+        allow update: if false;
+        allow delete: if quem() == conta
+          && conta in ['elisson', 'ramon', 'mariele']
+          && request.time < resource.data.criadoEm + duration.value(15, 'm');
+      }
+    }
+
+    // Foto e preferência de visualização de cada pessoa (inclui os pais).
+    match /perfis/{pessoa} {
+      allow read: if membro();
+      allow create, update: if quem() == pessoa
+        && request.resource.data.keys().hasOnly(['avatar', 'visaoInicio']);
+      allow delete: if false;
+    }
+  }
+}
