@@ -174,9 +174,18 @@ const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(
 const deB64u = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
 const passkeys = () => LS.get('passkeys', {});
 
+// Não confiamos só no teste do navegador (no iPhone instalado na tela inicial ele às vezes responde "não");
+// se o navegador tem WebAuthn, deixamos tentar e mostramos o erro real se falhar.
 async function verificarBio() {
-  try { S.temBio = !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); }
-  catch { S.temBio = false; }
+  S.temBio = !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+}
+function erroBio(e) {
+  const n = e?.name || '';
+  if (n === 'NotAllowedError') return `Cancelado ou não permitido. Tente de novo e confirme com o ${NOME_BIO}.`;
+  if (n === 'InvalidStateError') return 'Já existe um desbloqueio deste app neste celular. Toque em Ativar de novo.';
+  if (n === 'SecurityError') return 'O endereço do app não permite o desbloqueio. Abra pelo link do GitHub (https).';
+  if (IOS) return `Não foi possível ativar (${n || 'erro'}). No iPhone, confira em Ajustes: Face ID e Código ligado, e em [seu nome] > iCloud > Senhas (Chaveiro) ligado.`;
+  return `Não foi possível ativar (${n || 'erro'}). Confira se o celular tem bloqueio de tela (digital, PIN ou padrão).`;
 }
 async function ativarBio(k) {
   const cred = await navigator.credentials.create({ publicKey: {
@@ -293,7 +302,8 @@ function vLogin() {
   const pk = S.eu && passkeys()[S.eu];
   const tiles = TODOS.map((k) => `
     <button class="tile ${k === ultimo ? 'ultimo' : ''}" data-acao="escolher" data-k="${k}" aria-label="Entrar como ${esc(PESSOAS[k].completo)}">
-      ${avatar(k, 72)}<b>${esc(PESSOAS[k].nome)}</b><small>${k === 'pais' ? 'Acompanham a família' : 'Conta Itaú Personnalité'}</small>
+      <span class="t-id">${avatar(k, 83)}<b>${esc(PESSOAS[k].nome)}</b><small>${k === 'pais' ? 'Acompanham a família' : 'Conta Itaú Personnalité'}</small></span>
+      ${logo(false)}
     </button>`).join('');
   const rodape = S.eu && pk
     ? `<button class="btn prim bloco" data-acao="biometria">${ic.rosto.replace('<svg', '<svg width="22" height="22"')}Entrar com ${NOME_BIO}</button><small>ou use o código do celular</small><button class="linkbtn" data-acao="usar-pin">Entrar com o PIN de 8 dígitos</button>`
@@ -399,7 +409,7 @@ function vConta(k) {
     const mes = it.data.slice(0, 7);
     if (mes !== mesAnt) { lista += `<div class="rot mes">${cap(nomeMes(Number(mes.slice(5, 7))))} ${mes.slice(0, 4)}</div>`; mesAnt = mes; }
     const rend = it.tipo === 'rendimento'; const dep = it.tipo === 'deposito';
-    const pode = eu && !rend && it.id && Date.now() - (it.criadoEm || 0) < 15 * 60000;
+    const pode = eu && !rend && it.id && Date.now() - (it.criadoEm || 0) < 60 * 60000;
     lista += `<div class="item">
       <span class="ic ${dep || rend ? 'ouro' : 't2'}">${rend ? ic.rende : dep ? ic.entrada : ic.saida}</span>
       <span class="d"><b>${rend ? esc(it.descricao) : dep ? 'Depósito' : 'Retirada'}</b><small>${fmtData(it.data)}${pode ? ` · <button class="linkbtn" data-acao="pedir-excluir" data-k="${k}" data-id="${esc(it.id)}">Excluir (erro de digitação)</button>` : ''}</small></span>
@@ -485,9 +495,9 @@ function vPerfil() {
       ${hist ? `<span class="t3" style="font-size:12px">Histórico: ${hist}</span>` : ''}
       <button class="btn prim bloco" data-acao="salvar-inv">Salvar</button></section>` : ''}
     <section class="secao"><h2>Segurança</h2>
-      <div class="linha-sw"><span>Desbloqueio com ${NOME_BIO} / código<small>${S.temBio ? 'Desligado: o app pede o PIN de 8 dígitos ao abrir' : 'Indisponível: o app pede o PIN ao abrir'}</small></span>
+      <div class="linha-sw"><span>Desbloqueio com ${NOME_BIO} / código<small>${pk ? 'Ligado: o app abre com o rosto ou o código do celular' : S.temBio ? 'Desligado: o app pede o PIN de 8 dígitos ao abrir' : 'Este navegador não oferece: o app pede o PIN ao abrir'}</small></span>
         <button class="sw" role="switch" aria-checked="${pk}" aria-label="Desbloqueio com ${NOME_BIO}" data-acao="sw-bio" ${S.temBio || pk ? '' : 'disabled'}></button></div>
-      <div class="linha-sw"><span>Bloquear ao sair do app<small>Depois de 1 minuto fora</small></span>
+      <div class="linha-sw"><span>Bloquear ao sair do app<small>Depois de 10 minutos fora</small></span>
         <button class="sw" role="switch" aria-checked="${bloq}" aria-label="Bloquear ao sair do app" data-acao="sw-bloq"></button></div>
       <button class="btn bloco" data-acao="trocar-pin">Trocar meu PIN</button>
       <button class="btn bloco" data-acao="sair">Sair / trocar de usuário</button></section>
@@ -534,7 +544,7 @@ function vSheet() {
       <button class="btn prim bloco" data-acao="confirmar-lanc" ${ocup}>${S.ocupado ? 'Salvando…' : dep ? 'Confirmar depósito' : 'Confirmar retirada'}</button>
       <button class="btn bloco" data-acao="fechar">Cancelar</button>`;
   } else if (sh.tipo === 'excluir') {
-    corpo = `<h2 id="st">Excluir lançamento?</h2><p>Use só para corrigir erro de digitação. Depois de 15 minutos não é mais possível excluir.</p>${erro}
+    corpo = `<h2 id="st">Excluir lançamento?</h2><p>Use só para corrigir erro de digitação. Depois de 1 hora não é mais possível excluir.</p>${erro}
       <button class="btn prim bloco" data-acao="confirmar-excluir" ${ocup}>Excluir</button><button class="btn bloco" data-acao="fechar">Cancelar</button>`;
   } else if (sh.tipo === 'ativar-bio') {
     corpo = `<h2 id="st">Ativar ${NOME_BIO}?</h2><p>Nas próximas vezes, o app abre com o seu rosto ou o código de desbloqueio do celular. Sem isso, o app pede o PIN de 8 dígitos toda vez que abrir.</p>${erro}
@@ -555,6 +565,9 @@ function irPara(h) { if (location.hash === h) render(); else location.hash = h; 
 function render() {
   const app = $('#app');
   if (!S.pronto) return;
+  const chave = (!S.eu || S.bloqueado) ? 'login' : location.hash;
+  const rolagem = chave === S.ultimaTela ? ($('#app .tela, #app .login')?.scrollTop || 0) : 0;
+  S.ultimaTela = chave;
   if (!S.eu || S.bloqueado) app.innerHTML = vLogin();
   else if (!S.dados || !S.calc) app.innerHTML = '<div class="carregando">Carregando…</div>';
   else {
@@ -562,6 +575,7 @@ function render() {
     app.innerHTML = r.tela === 'conta' && CONTAS.includes(r.param) ? vConta(r.param)
       : r.tela === 'familia' ? vFamilia() : r.tela === 'perfil' ? vPerfil() : vInicio();
   }
+  if (rolagem) { const t = $('#app .tela, #app .login'); if (t) t.scrollTop = rolagem; }
 }
 function abrirSheet(sh) {
   S.sheet = sh; S.erro = ''; S.ocupado = false; renderSheet();
@@ -644,8 +658,8 @@ const acoes = {
   },
   async 'ativar-bio'() {
     S.ocupado = true; renderSheet();
-    try { await ativarBio(S.eu); LS.del('bioRecusada.' + S.eu); fecharSheet(); aviso(`${NOME_BIO} ativado.`); render(); }
-    catch { erroSheet(`Não foi possível ativar. Confira se o ${NOME_BIO} está ligado no celular.`); }
+    try { await ativarBio(S.eu); LS.del('bioRecusada.' + S.eu); fecharSheet(); aviso(`Desbloqueio com ${NOME_BIO} ativado.`); render(); }
+    catch (e) { console.error(e); erroSheet(erroBio(e)); }
   },
   async 'sw-bio'() {
     const pk = passkeys();
@@ -738,13 +752,13 @@ document.addEventListener('change', async (e) => {
   } catch (err) { aviso(traduzErro(err)); }
 });
 document.addEventListener('focusout', () => { if (S.pendente) setTimeout(() => { if (!document.activeElement?.closest?.('#app input')) { S.pendente = false; render(); } }, 50); });
-window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => render());
 
-// privacidade: borra ao sair e bloqueia depois de 1 minuto fora
+// privacidade: borra ao sair e bloqueia depois de 10 minutos fora
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { document.body.classList.add('oculto-privacidade'); S.saiuEm = Date.now(); return; }
   document.body.classList.remove('oculto-privacidade');
-  if (S.eu && LS.get('bloquearAoSair', true) && Date.now() - S.saiuEm > 60000) { S.bloqueado = true; fecharSheet(); render(); }
+  if (S.eu && LS.get('bloquearAoSair', true) && Date.now() - S.saiuEm > 10 * 60000) { S.bloqueado = true; fecharSheet(); render(); }
   if (S.dados) { recalcular(); render(); } // a data pode ter mudado
 });
 
