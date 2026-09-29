@@ -1,7 +1,7 @@
 // Contas da Família — app (PWA). Tema noturno, dados no Firebase (ou modo demonstração).
 import {
   calcularConta, taxaEm, taxaDiaria, hojeISO, fmtBRL, fmtNum, fmtData, fmtPct, nomeMes, parseValorBR,
-} from './calc.js?v=18';
+} from './calc.js?v=19';
 import { firebaseConfig, LOGINS } from './firebase-config.js';
 
 // ---------------------------------------------------------------- pessoas
@@ -14,7 +14,7 @@ const PESSOAS = {
 const CONTAS = ['elisson', 'ramon', 'mariele'];
 const TODOS = ['elisson', 'ramon', 'mariele', 'pais'];
 const FIREBASE_VERSAO = '10.12.2';
-const VERSAO = '1.8';
+const VERSAO = '1.9';
 const INSTALADO = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
 const DEMO = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('COLE') || new URLSearchParams(location.search).has('demo');
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -318,6 +318,22 @@ function grafBarras(porMes, hoje) {
     <div class="t3" style="font-size:11px">* mês atual, até ${fmtData(hoje).slice(0, 5)}</div>`;
 }
 
+// ---------------------------------------------------------------- memória de cálculo (conferência das fórmulas)
+const somarDiasISO = (iso, n) => { const [a, m, d] = iso.split('-').map(Number); return new Date(Date.UTC(a, m - 1, d + n)).toISOString().slice(0, 10); };
+function memoriaCalculo(c) {
+  if (!c.periodos?.length) return '';
+  const linhas = c.periodos.map((p) => `<div class="mem-linha">
+      <div><b>${fmtData(p.de)} → ${fmtData(p.ate)}</b><small>${fmtTaxa(p.mensal)}% a.m. = ${fmtPct(p.diaria, 4)} por dia útil · ${p.diasUteis} ${p.diasUteis === 1 ? 'dia útil' : 'dias úteis'}</small></div>
+      <span class="num ouro">+ ${fmtBRL(p.rendimento)}</span></div>`).join('');
+  return `<details class="secao memoria"><summary><h2>Memória de cálculo</h2></summary>
+    ${linhas}
+    <div class="mem-linha"><div><small>Depósitos − retiradas</small></div><span class="num">${fmtBRL(c.depositado - c.retirado)}</span></div>
+    <div class="mem-linha"><div><small>+ Rendimento total</small></div><span class="num ouro">+ ${fmtBRL(c.rendimentoTotal)}</span></div>
+    <div class="mem-linha total"><div><b>= Saldo</b></div><span class="num">${fmtBRL(c.saldo)}</span></div>
+    <small class="t3">Fórmula: a cada dia útil, saldo × (1 + taxa ao mês)^(1/21). Um mês tem 21 dias úteis (252 por ano); fins de semana e feriados nacionais não rendem. Cada depósito começa a render no dia útil seguinte à sua data.</small>
+  </details>`;
+}
+
 // ---------------------------------------------------------------- telas
 function vLogin() {
   const ultimo = S.eu || LS.get('ultimo', null);
@@ -450,6 +466,7 @@ function vConta(k) {
     <section class="grafico" aria-label="Gráfico do saldo"><span class="rot">Evolução do saldo</span>${grafLinha(c.serie)}</section>
     ${eu ? `<div class="botoes"><button class="btn prim" data-acao="lanc" data-mov="deposito" data-k="${k}">Depósito R$</button><button class="btn" data-acao="lanc" data-mov="retirada" data-k="${k}" ${c.saldo > 0 ? '' : 'disabled'}>Retirada R$</button></div>`
       : '<div class="chip" style="align-self:flex-start">Somente leitura — só o titular movimenta esta conta</div>'}
+    ${memoriaCalculo(c)}
     <section class="extrato" aria-label="Extrato"><h2 class="num" style="margin:8px 0 0;font-size:20px;font-weight:600">Extrato</h2>
       ${lista || '<div class="vazio-bloco">Nenhum depósito ainda.</div>'}
       ${lista ? '<small class="t3" style="font-size:12px;margin-top:8px">O rendimento é creditado todo dia útil; o extrato agrupa por mês.</small>' : ''}
@@ -494,7 +511,8 @@ function vPerfil() {
   const conta = S.dados.contas[k] || {}; const taxas = conta.taxas || [];
   const txAtual = taxas.length ? taxaEm(taxas, S.calc.hoje) : null;
   const pk = !!passkeys()[k]; const bloq = LS.get('bloquearAoSair', true);
-  const hist = [...taxas].sort((a, b) => b.aPartirDe.localeCompare(a.aPartirDe)).map((t) => `${fmtTaxa(t.mensal)}% a.m. desde ${fmtData(t.aPartirDe)}`).join(' · ');
+  const ordenadas = [...taxas].sort((a, b) => a.aPartirDe.localeCompare(b.aPartirDe));
+  const hist = ordenadas.map((t, i) => `${fmtTaxa(t.mensal)}% a.m. ${i === 0 ? (ordenadas.length > 1 ? `até ${fmtData(somarDiasISO(ordenadas[1].aPartirDe, -1))}` : 'em todo o período') : `desde ${fmtData(t.aPartirDe)}`}`).join(' · ');
   return `<div class="tela">
     <header class="topo"><h1 class="num" style="margin:0;font-size:28px;font-weight:700">Perfil</h1></header>
     <section class="perfil-cab">${avatar(k, 88)}
@@ -513,7 +531,12 @@ function vPerfil() {
       <div class="campo"><label for="inv-taxa">Rendimento ao mês (% a.m.)</label><input id="inv-taxa" inputmode="decimal" autocomplete="off" value="${txAtual != null ? fmtTaxa(txAtual) : ''}" placeholder="Ex.: 0,85">
         <span class="ajuda" id="inv-taxa-ajuda">${textoConferencia(txAtual).ajuda}</span></div>
       <div class="campo"><label for="inv-anual">Rendimento ao ano (só para conferir)</label><input id="inv-anual" class="somente-leitura" readonly tabindex="-1" value="${textoConferencia(txAtual).anual}" placeholder="—">
-        <span class="ajuda">Calculado sozinho: juros compostos de 12 meses. Uma taxa nova vale a partir de hoje.</span></div>
+        <span class="ajuda">Calculado sozinho: juros compostos de 12 meses.</span></div>
+      <fieldset class="campo modo-taxa"><legend>Aplicar esta taxa</legend>
+        <label class="opcao"><input type="radio" name="inv-modo" value="tudo" checked><span><b>Em todo o período</b><small>Recalcula tudo desde o primeiro depósito com esta taxa</small></span></label>
+        <label class="opcao"><input type="radio" name="inv-modo" value="data"><span><b>Só a partir de uma data</b><small>Antes da data continua a taxa anterior (quando o banco muda a taxa)</small></span></label>
+        <input id="inv-data" type="date" max="${S.calc.hoje}" value="${S.calc.hoje}" aria-label="Data a partir da qual vale a nova taxa">
+      </fieldset>
       <div class="dupla"><div class="campo"><label for="inv-ag">Agência</label><input id="inv-ag" inputmode="numeric" maxlength="6" value="${esc(conta.agencia || '')}" placeholder="0000"></div>
         <div class="campo"><label for="inv-cc">Conta</label><input id="inv-cc" maxlength="12" value="${esc(conta.conta || '')}" placeholder="00000-0"></div></div>
       ${hist ? `<span class="t3" style="font-size:12px">Histórico: ${hist}</span>` : ''}
@@ -750,16 +773,23 @@ const acoes = {
     if (txt) {
       const taxa = lerTaxa(txt);
       if (taxa == null || taxa < 0 || taxa > 0.2) return aviso('Taxa inválida. Exemplos: 0,85 · 0,5 · 1,00 (até 20% ao mês).');
-      let taxas = [...(conta.taxas || [])]; const hoje = hojeISO();
-      if (!taxas.length) {
-        const primeira = (S.dados.lanc[k] || []).map((l) => l.data).sort()[0];
-        taxas = [{ mensal: taxa, aPartirDe: primeira && primeira < hoje ? primeira : hoje }];
-      } else if (Math.abs(taxaEm(taxas, hoje) - taxa) > 1e-9) {
-        taxas = taxas.filter((t) => t.aPartirDe !== hoje); taxas.push({ mensal: taxa, aPartirDe: hoje });
+      const hoje = hojeISO();
+      const modo = document.querySelector('input[name="inv-modo"]:checked')?.value || 'tudo';
+      let taxas;
+      if (modo === 'data') {
+        const d = $('#inv-data')?.value || hoje;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d > hoje) return aviso('Escolha uma data até hoje.');
+        taxas = (conta.taxas || []).filter((t) => t.aPartirDe < d);
+        taxas.push({ mensal: taxa, aPartirDe: d });
+        S.msgTaxa = `Salvo. ${fmtTaxa(taxa)}% a.m. a partir de ${fmtData(d)}; antes disso vale a taxa anterior.`;
+      } else {
+        // uma única taxa para todo o histórico: o saldo é recalculado desde o primeiro depósito
+        taxas = [{ mensal: taxa, aPartirDe: '2000-01-01' }];
+        S.msgTaxa = `Salvo. Saldo recalculado com ${fmtTaxa(taxa)}% a.m. em todo o período.`;
       }
       campos.taxas = taxas;
     }
-    try { await S.backend.salvarConta(k, campos); aviso('Salvo.'); } catch (e) { aviso(traduzErro(e)); }
+    try { await S.backend.salvarConta(k, campos); aviso(S.msgTaxa && txt ? S.msgTaxa : 'Salvo.'); S.msgTaxa = ''; } catch (e) { aviso(traduzErro(e)); }
   },
   'pos-barra'(el) {
     const d = Number(el.dataset.d);

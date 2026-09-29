@@ -92,7 +92,7 @@ export function calcularConta({ lancamentos = [], taxas = [], hoje = hojeISO() }
   const res = {
     saldo: 0, depositado: 0, retirado: 0, rendimentoTotal: 0,
     rendimentoHoje: 0, rendimentoMesAtual: 0,
-    porMes: [], serie: [], extrato: [], taxaAtual: taxaEm(taxas, hoje),
+    porMes: [], serie: [], extrato: [], periodos: [], taxaAtual: taxaEm(taxas, hoje),
   };
   if (validos.length === 0) return res;
 
@@ -113,15 +113,23 @@ export function calcularConta({ lancamentos = [], taxas = [], hoje = hojeISO() }
   const meses = new Map(); // 'AAAA-MM' → { rendimento, diasUteis }
   let saldo = 0;
 
+  let periodo = null; // trechos com a mesma taxa (memória de cálculo)
   for (let dia = inicio; dia <= hoje; dia = somarDias(dia, 1)) {
     const mes = dia.slice(0, 7);
+    const mensal = taxaEm(taxas, dia);
+    if (!periodo || periodo.mensal !== mensal) {
+      periodo = { de: dia, ate: dia, mensal, diaria: taxaDiaria(mensal), diasUteis: 0, rendimento: 0 };
+      res.periodos.push(periodo);
+    }
+    periodo.ate = dia;
     if (!meses.has(mes)) meses.set(mes, { rendimento: 0, diasUteis: 0 });
     const acc = meses.get(mes);
 
     // 1º: rendimento sobre o saldo do início do dia (só em dia útil com saldo).
     if (saldo > 0 && ehDiaUtil(dia)) {
-      const r = saldo * taxaDiaria(taxaEm(taxas, dia));
+      const r = saldo * taxaDiaria(mensal);
       saldo += r;
+      periodo.diasUteis++; periodo.rendimento += r;
       acc.rendimento += r;
       acc.diasUteis++;
       res.rendimentoTotal += r;

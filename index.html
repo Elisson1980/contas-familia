@@ -42,6 +42,26 @@ html,body{margin:0;position:fixed;inset:0;width:100%;height:100%;overflow:hidden
 .ajuste-linha .btn{flex:1;height:44px;min-width:0;padding:0 4px;font-size:15px}
 .ajuste-linha .btn[data-d="-5"],.ajuste-linha .btn[data-d="5"]{flex:0 0 56px;font-size:22px;font-weight:600}
 .ajuste-linha b{flex:0 0 72px}
+.modo-taxa{border:0;padding:0;margin:0;gap:8px}
+.modo-taxa legend{font-size:12px;font-weight:500;color:var(--t2);padding:0;margin-bottom:6px}
+.modo-taxa .opcao{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--b2);border-radius:12px;background:var(--s1);cursor:pointer}
+.modo-taxa .opcao input{margin-top:3px;accent-color:var(--ouro);width:18px;height:18px;flex:none}
+.modo-taxa .opcao span{display:flex;flex-direction:column;gap:2px}
+.modo-taxa .opcao b{font-size:14px;font-weight:600}
+.modo-taxa .opcao small{font-size:12px;color:var(--t3)}
+.modo-taxa .opcao:has(input:checked){border-color:var(--ouro)}
+.modo-taxa:not(:has(input[value="data"]:checked)) #inv-data{display:none}
+.memoria summary{list-style:none;cursor:pointer}
+.memoria summary::-webkit-details-marker{display:none}
+.memoria summary h2::after{content:"ver";font-family:var(--txt);font-size:12px;font-weight:500;color:var(--ouro)}
+.memoria[open] summary h2::after{content:"fechar"}
+.mem-linha{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--b1)}
+.mem-linha > div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mem-linha b{font-size:14px;font-weight:600}
+.mem-linha small{font-size:12px;color:var(--t3)}
+.mem-linha .num{font-weight:600;white-space:nowrap}
+.mem-linha.total{border-bottom:0}
+.memoria > small{font-size:12px;line-height:1.5}
 .campo input.somente-leitura{background:transparent;border-style:dashed;color:var(--ouro2);font-family:var(--num);font-weight:600}
 .ajuste-linha b{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:16px;min-width:60px;text-align:center}
 .versao{font-size:11px;color:var(--t3);text-align:center}
@@ -241,6 +261,6 @@ button{cursor:pointer}
 <div id="app"><div class="carregando">Carregando…</div></div>
 <div id="camada"></div>
 <div id="sonda" aria-hidden="true"></div>
-<script type="module" src="app.js?v=18"></script>
+<script type="module" src="app.js?v=19"></script>
 </body>
 </html>
